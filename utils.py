@@ -46,7 +46,7 @@ def returnClientByDataset(dataSetName):
         return 15
     elif(dataSetName == "MotionSense"):
         return 24 
-    elif(dataSetName == 'SHL'):
+    elif(dataSetName == 'SHL_128'):
         return 9
     elif(dataSetName == "HHAR"):
         return 51
@@ -180,7 +180,7 @@ def loadDataset(dataSetName, clientCount, dataConfig, randomSeed, mainDir, Strat
     orientationsNames = None
     
     
-    if(dataSetName == "UCI"):
+    if(dataSetName == "UCI"): # UCI dataset
 
         centralTrainData = hkl.load(mainDir + 'datasetStandardized/'+str(dataSetName)+'/trainX.hkl')
         centralTestData = hkl.load(mainDir + 'datasetStandardized/'+str(dataSetName)+'/testX.hkl')
@@ -188,7 +188,7 @@ def loadDataset(dataSetName, clientCount, dataConfig, randomSeed, mainDir, Strat
         centralTestLabel = hkl.load(mainDir + 'datasetStandardized/'+str(dataSetName)+'/testY.hkl')
 
         
-    elif(dataSetName == "SHL"):
+    elif(dataSetName == "SHL"): #SHL dataset
         clientData = hkl.load(mainDir + 'datasetStandardized/'+str(dataSetName)+'/clientsData.hkl')
         clientLabel = hkl.load(mainDir + 'datasetStandardized/'+str(dataSetName)+'/clientsLabel.hkl')
         clientCount = clientData.shape[0]
@@ -221,7 +221,7 @@ def loadDataset(dataSetName, clientCount, dataConfig, randomSeed, mainDir, Strat
         centralTestData = np.vstack((clientDataTest))
         centralTestLabel = np.hstack((clientLabelTest))
         
-    elif(dataSetName == "RealWorld"):
+    elif(dataSetName == "RealWorld"): #Realworld dataset
         orientationsNames = ['chest','forearm','head','shin','thigh','upperarm','waist']
         clientDataTrain = {new_list: [] for new_list in range(clientCount)}
         clientLabelTrain = {new_list: [] for new_list in range(clientCount)}

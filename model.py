@@ -8,6 +8,7 @@ import tensorflow as tf
 
 from tensorflow.keras import layers
 import numpy as np
+from keras.activations import swish
 
 randomSeed = 1
 # tf.random.set_seed(randomSeed)
@@ -432,7 +433,7 @@ def conv_block(x, filters=16, kernel_size=3, strides=2):
 def inverted_residual_block(x, expanded_channels, output_channels, strides=1):
     m = layers.Conv1D(expanded_channels, 1, padding="same", use_bias=False)(x)
     m = layers.BatchNormalization()(m)
-    m = tf.nn.swish(m)
+    m = swish(m)
 
     if strides == 2:
         m = layers.ZeroPadding1D(padding=1)(m)
@@ -440,7 +441,7 @@ def inverted_residual_block(x, expanded_channels, output_channels, strides=1):
         3, strides=strides, padding="same" if strides == 1 else "valid", use_bias=False
     )(m)
     m = layers.BatchNormalization()(m)
-    m = tf.nn.swish(m)
+    m = swish(m)
 
     m = layers.Conv1D(output_channels, 1, padding="same", use_bias=False)(m)
     m = layers.BatchNormalization()(m)

@@ -86,22 +86,22 @@ links = [
 
 
 # # download and unzipping dataset/download
-# os.makedirs('dataset/download',exist_ok=True)
-# os.makedirs('dataset/extracted',exist_ok=True)
+os.makedirs('dataset/download',exist_ok=True)
+os.makedirs('dataset/extracted',exist_ok=True)
 
-# for i in range(len(fileName)):
-#     data_directory = os.path.abspath("dataset/download/"+str(fileName[i]))
-#     if not os.path.exists(data_directory):
-#         print("downloading "+str(fileName[i]))            
-#         download_url(links[i],data_directory)
-#         print("download done")
-#         data_directory2 =  os.path.abspath("dataset/extracted/"+str(fileName[i]))
-#         print("extracting data...")
-#         with zipfile.ZipFile(data_directory, 'r') as zip_ref:
-#             zip_ref.extractall(os.path.abspath("dataset/extracted/"))
-#         print("data extracted")
-#     else:
-#         print(str(fileName[i]) + " already downloaded")
+for i in range(len(fileName)):
+    data_directory = os.path.abspath("dataset/download/"+str(fileName[i]))
+    if not os.path.exists(data_directory):
+        print("downloading "+str(fileName[i]))            
+        download_url(links[i],data_directory)
+        print("download done")
+        data_directory2 =  os.path.abspath("dataset/extracted/"+str(fileName[i]))
+        print("extracting data...")
+        with zipfile.ZipFile(data_directory, 'r') as zip_ref:
+            zip_ref.extractall(os.path.abspath("dataset/extracted/"))
+        print("data extracted")
+    else:
+        print(str(fileName[i]) + " already downloaded")
 
 
 # In[ ]:
@@ -242,7 +242,7 @@ gyroStd =  np.std(combinedGyroData)
 # In[ ]:
 
 
-userData = np.asarray(userData, dtype=objec)
+userData = np.asarray(userData, dtype=object)
 
 
 # In[ ]:

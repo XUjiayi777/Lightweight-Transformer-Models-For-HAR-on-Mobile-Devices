@@ -2,7 +2,13 @@
 # coding: utf-8
 
 # In[ ]:
+import model 
 
+input_shape = (128,6) # The shape of your input data
+activityCount = 6 # Number of classification heads
+
+HART = model.HART(input_shape,activityCount)
+MobileHART = model.mobileHART_XS(input_shape,activityCount)
 
 import os
 randomSeed = 1
@@ -46,15 +52,15 @@ import __main__ as main
 
 import model 
 import utils
-from keras_flops import get_flops
+# from keras_flops import get_flops
 
 
 # In[ ]:
 
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
-for gpu in gpus:
-    tf.config.experimental.set_memory_growth(gpu, True)
+# for gpu in gpus:
+#     tf.config.experimental.set_memory_growth(gpu, True)
 
 
 # In[ ]:
@@ -180,7 +186,7 @@ transformer_units = [
     projection_dim,
 ]  # Size of the transformer layers
 
-R = projectionHalf // filterAttentionHead
+R  = projectionHalf // filterAttentionHead
 assert R * filterAttentionHead == projectionHalf
 
 
@@ -243,7 +249,7 @@ random.seed(randomSeed)
 
 
 if(dataSetName == "COMBINED"):
-    datasetList = ["UCI","RealWorld","HHAR", "MotionSense","SHL_128"]
+    datasetList = ["UCI","RealWorld","HHAR", "MotionSense"]
     ACTIVITY_LABEL = ['Walk', 'Upstair', 'Downstair', 'Sit', 'Stand', 'Lay', 'Jump','Run', 'Bike', 'Car', 'Bus', 'Train', 'Subway']
     activityCount = len(ACTIVITY_LABEL)
     UCI = [0,1,2,3,4,5]
@@ -313,15 +319,36 @@ if(positionDevice != '' or dataSetName == 'UCI'):
         totalData = np.vstack((centralTrainData,centralTestData))
         totalLabel = np.hstack((centralTrainLabel,centralTestLabel))
         totalOrientation = np.hstack((np.hstack((clientOrientationTrain)), np.hstack((clientOrientationTest))))
-        totalIndex = list(range(totalOrientation.shape[0]))
-        testDataIndex = np.where(totalOrientation == orientationsNames.index(positionDevice))[0]
-        trainDataIndex = np.delete(totalIndex,testDataIndex)
+        # totalIndex = list(range(totalOrientation.shape[0]))
+        # testDataIndex = np.where(totalOrientation == orientationsNames.index(positionDevice))[0]
+        # trainDataIndex = np.delete(totalIndex,testDataIndex)
 
-        centralTrainData = totalData[trainDataIndex]
-        centralTestData = totalData[testDataIndex]
+        # centralTrainData = totalData[trainDataIndex]
+        # centralTestData = totalData[testDataIndex]
 
-        centralTrainLabel = totalLabel[trainDataIndex]
-        centralTestLabel = totalLabel[testDataIndex]
+        # centralTrainLabel = totalLabel[trainDataIndex]
+        # centralTestLabel = totalLabel[testDataIndex]
+        split_ratio=0.8
+        deviceIndex = np.where(totalOrientation == orientationsNames.index(positionDevice))[0]
+    
+        if len(deviceIndex) > 0:  
+            totalData = totalData[deviceIndex]  
+            totalLabel = totalLabel[deviceIndex]
+            
+            indices = np.arange(len(totalData))
+            np.random.shuffle(indices)
+            
+            totalData = totalData[indices]
+            totalLabel = totalLabel[indices]
+            
+            # Determine the split index based on the specified ratio
+            split_index = int(len(totalData) * split_ratio)
+            centralTrainData = totalData[:split_index]
+            centralTestData = totalData[split_index:]
+            
+            centralTrainLabel = totalLabel[:split_index]
+            centralTestLabel = totalLabel[split_index:]
+            
     elif(dataSetName == "HHAR"):
         totalData = np.vstack((centralTrainData,centralTestData))
         totalLabel = np.hstack((centralTrainLabel,centralTestLabel))
@@ -407,7 +434,7 @@ model_classifier.summary()
 # In[ ]:
 
 
-checkpoint_filepath = filepath+"bestValcheckpoint.h5"
+checkpoint_filepath = filepath+"bestValcheckpoint.weights.h5"
 checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     checkpoint_filepath,
     monitor="val_accuracy",
@@ -429,7 +456,7 @@ history = model_classifier.fit(
 )
 end_time = time.time() - start_time
 
-model_classifier.save_weights(filepath + 'bestTrain.h5')
+model_classifier.save_weights(filepath + 'bestTrain.weights.h5')
 model_classifier.load_weights(checkpoint_filepath)
 _, accuracy = model_classifier.evaluate(centralTestData, centralTestLabel)
 print(f"Test accuracy: {round(accuracy * 100, 2)}%")
@@ -632,10 +659,10 @@ with open(filepath +architecture+'.tflite', 'wb') as f:
 
 
 # Saves the training time per round
-flops = get_flops(model_classifier, batch_size=1)
+# flops = get_flops(model_classifier, batch_size=1)
 modelStatistics = {
     "NumberOfParams:": str(model_classifier.count_params()),
-    "flops": str(flops),
+    # "flops": str(flops),
     "TrainingTime": str(end_time / 360),
 }
 with open(filepath +'numberOfParams.csv','w') as f:
