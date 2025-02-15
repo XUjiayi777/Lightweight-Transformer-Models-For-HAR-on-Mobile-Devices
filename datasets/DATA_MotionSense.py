@@ -152,7 +152,7 @@ for activityIndex, activityFileName in enumerate(dirs):
     subjectFileNames = sorted(os.listdir(extractedDirectory + "/"+activityFileName))
     for clientIndex, subFileName in enumerate(subjectFileNames):
         loadedData = load_file(extractedDirectory+"/"+activityFileName+"/"+subFileName)
-        processedData = segmentData(np.hstack((loadedData[:,10:13],loadedData[:,7:10]))[1:,:],128,64)
+        processedData = segmentData(np.hstack((loadedData[:,10:13],loadedData[:,4:10]))[1:,:],128,64)
         clientData[clientIndex].append(processedData.astype(np.float32))
         clientLabel[clientIndex].append(np.full(processedData.shape[0], matchLabel(activityFileName), dtype=int))
 
@@ -178,7 +178,8 @@ combinedUserData = np.vstack((processedData))
 
 
 combinedAccData = combinedUserData[:,:,:3]
-combinedGyroData = combinedUserData[:,:,3:]
+combinedGyroData = combinedUserData[:,:,6:]
+combinedGraData = combinedUserData[:,:,3:6]
 
 
 # In[ ]:
@@ -186,9 +187,12 @@ combinedGyroData = combinedUserData[:,:,3:]
 
 accMean =  np.mean(combinedAccData)
 accStd =  np.std(combinedAccData)
-                   
+       
 gyroMean =  np.mean(combinedGyroData)
 gyroStd =  np.std(combinedGyroData)
+
+GraMean = np.mean(combinedGraData)    
+Grastd = np.std(combinedGraData) 
 
 
 # In[ ]:
@@ -196,12 +200,13 @@ gyroStd =  np.std(combinedGyroData)
 
 combinedAccData = (combinedAccData - accMean)/accStd
 combinedGyroData = (combinedGyroData - gyroMean)/gyroStd
+combinedGraData = (combinedGraData - GraMean)/Grastd
 
 
 # In[ ]:
 
 
-combinedUserData = np.dstack((combinedAccData,combinedGyroData))
+combinedUserData = np.dstack((combinedAccData,combinedGyroData,combinedGraData))
 
 
 # In[ ]:
@@ -210,12 +215,12 @@ combinedUserData = np.dstack((combinedAccData,combinedGyroData))
 startIndex = 0
 endIndex = 0 
 dataName = 'MotionSense'
-os.makedirs('datasetStandardized/'+dataName, exist_ok=True)
+os.makedirs('datasetStandardized_s3/'+dataName, exist_ok=True)
 for i in range(len(processedData)):
     startIndex = endIndex 
     endIndex = startIndex +  processedData[i].shape[0]
-    hkl.dump(combinedUserData[startIndex:endIndex],'datasetStandardized/'+dataName+'/UserData'+str(i)+'.hkl' )
-    hkl.dump(processedLabel[i],'datasetStandardized/'+dataName+'/UserLabel'+str(i)+'.hkl' )
+    hkl.dump(combinedUserData[startIndex:endIndex],'datasetStandardized_s3/'+dataName+'/UserData'+str(i)+'.hkl' )
+    hkl.dump(processedLabel[i],'datasetStandardized_s3/'+dataName+'/UserLabel'+str(i)+'.hkl' )
 
 
 # In[ ]:

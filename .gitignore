@@ -2,6 +2,7 @@ input/
 output/
 HART_Results/
 datasets/dataset
-datasets/datasetStandardized
+datasets/datasetStandardized*
 __pycache__/
 test.ipynb
+.vscode/

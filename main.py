@@ -2,13 +2,13 @@
 # coding: utf-8
 
 # In[ ]:
-import model 
+# import model 
 
-input_shape = (128,6) # The shape of your input data
-activityCount = 6 # Number of classification heads
+# input_shape = (128,9) # The shape of your input data
+# activityCount = 6 # Number of classification heads
 
-HART = model.HART(input_shape,activityCount)
-MobileHART = model.mobileHART_XS(input_shape,activityCount)
+# HART = model.HART(input_shape,activityCount)
+# MobileHART = model.mobileHART_XS(input_shape,activityCount)
 
 import os
 randomSeed = 1
@@ -45,6 +45,8 @@ import seaborn as sns
 import argparse
 import matplotlib.gridspec as gridspec
 import __main__ as main
+
+import pdb
 
 
 # In[ ]:
@@ -88,7 +90,7 @@ showTrainVerbose = 1
 segment_size = 128
 
 # input channel count
-num_input_channels = 6
+num_input_channels = 9
 
 learningRate = 5e-3
 
@@ -178,20 +180,23 @@ if not is_interactive():
     positionDevice = args.positionDevice
     
 input_shape = (segment_size,num_input_channels)
+print("input_shape",input_shape)
+
 projectionHalf = projection_dim//2
+projectionThird = projection_dim//3
 projectionQuarter = projection_dim//4
 
 transformer_units = [
-    projection_dim * 2,
+    projection_dim * 3,
     projection_dim,
 ]  # Size of the transformer layers
 
 R  = projectionHalf // filterAttentionHead
-assert R * filterAttentionHead == projectionHalf
+R1 = projectionThird // filterAttentionHead
+assert R * filterAttentionHead == projectionHalf or R1 == projectionThird
 
 
 segmentTime = [x for x in range(0,segment_size - frameLength + timeStep,timeStep)]
-assert R * filterAttentionHead == projectionHalf
 if(positionDevice != ''):
     assert dataSetName == "RealWorld" or dataSetName == "HHAR"
 
@@ -214,7 +219,8 @@ else:
 
 activityCount = len(ACTIVITY_LABEL)
 
-architectureType = str(architecture)+'_'+str(int(frameLength))+'frameLength_'+str(timeStep)+'TimeStep_'+str(projection_dim)+"ProjectionSize_"+str(learningRate)+'LR'
+architectureType = str(architecture)+'_'+'3sensors'+'_'+str(int(localEpoch))+'localEpoch_'+'_'+str(int(frameLength))+'frameLength_'+str(timeStep)+'TimeStep_'+str(projection_dim)+"ProjectionSize_"+str(learningRate)+'LR'
+print("architectureType: ",architectureType)
 if(tokenBased):
     architectureType = architectureType + "_tokenBased"
     
@@ -272,6 +278,7 @@ if(dataSetName == "COMBINED"):
         print(dataSetName + " has class :" +str(np.unique(centralTrainLabel[-1])))
         del loadedDataset
 
+    print("centralTrainData shape1: ", centralTrainData.shape)
     centralTestLabelAligned = []
     centralTrainLabelAligned = []
     combinedAlignedData = centralTestData
@@ -296,6 +303,7 @@ if(dataSetName == "COMBINED"):
     centralTestData = np.vstack((centralTestData))
     centralTrainLabel = np.hstack((centralTrainLabelAligned))
     centralTestLabel = np.hstack((centralTestLabelAligned))
+    print("centralTrainData shape2: ", centralTrainData.shape)
 else:
     clientCount = utils.returnClientByDataset(dataSetName)
     datasetLoader = utils.loadDataset(dataSetName,clientCount,dataConfig,randomSeed,mainDir+'datasets/')
@@ -370,7 +378,6 @@ else:
 #     using a 70 10 20 ratio
     centralTrainData, centralDevData, centralTrainLabel, centralDevLabel = train_test_split(centralTrainData, centralTrainLabel, test_size=0.125, random_state=randomSeed)
 
-
 # In[ ]:
 
 
@@ -420,7 +427,7 @@ centralDevLabel = tf.one_hot(
 optimizer = tf.keras.optimizers.Adam(learningRate)
 
 if(architecture == "HART"):
-    model_classifier = model.HART(input_shape,activityCount)
+    model_classifier = model.HART_3sensors(input_shape,activityCount)
 else:
     model_classifier = model.mobileHART_XS(input_shape,activityCount)
 model_classifier.compile(
@@ -483,6 +490,7 @@ def getLayerIndexByName(model, layername):
 if(architecture == "HART"):
     finalAccMHAIndex = getLayerIndexByName(model_classifier,"AccMHA_"+str(len(convKernels)-1))
     finalGyroMHAIndex = getLayerIndexByName(model_classifier,"GyroMHA_"+str(len(convKernels)-1))
+    finalGravMHAIndex = getLayerIndexByName(model_classifier,"GravMHA_1")
     finalInputsIndex = getLayerIndexByName(model_classifier,"normalizedInputs_"+str(len(convKernels)-1))
     totalLayer = len(model_classifier.layers)
     classTokenIndex = totalLayer - 4
@@ -530,12 +538,14 @@ for index, classLoc in enumerate(indices):
     inputsToAttention = inputModel(np.expand_dims(centralTestData[classLoc],0))
     _,attentionAccWeights = model_classifier.layers[finalAccMHAIndex](inputsToAttention, return_attention_scores=True)
     _,attentionGyroWeights = model_classifier.layers[finalGyroMHAIndex](inputsToAttention, return_attention_scores=True)
+    _,attentionGravWeights = model_classifier.layers[finalGravMHAIndex](inputsToAttention, return_attention_scores=True)
     if(tokenBased):
         attentionScores = np.mean(attentionAccWeights[0],axis = 0)[0,1:]
     else:
          attentionScores = np.mean(attentionAccWeights[0],axis = 0)[0,:]
     attentionScoresNorm = ((attentionScores - min(attentionScores))/(max(attentionScores) - min(attentionScores)) -1) * - 0.5
-    gs = gridspec.GridSpec(2,1)
+    
+    gs = gridspec.GridSpec(3,1)
     fig = plt.figure()
     plt.title("Attention Map for "+ACTIVITY_LABEL[index]+" ",size =16)    
     plt.margins(x=0)
@@ -558,7 +568,7 @@ for index, classLoc in enumerate(indices):
     for barIndex, starTime in enumerate(segmentTime):
         ax.axvspan(starTime, starTime + frameLength, facecolor='black', alpha=float(attentionScoresNorm[barIndex]),zorder=4)
         
-    ax.set_ylabel(r'Acc ($m/s^2$)', size =16)
+    ax.set_ylabel(r'Acc ($m/s^2$)', size =10)
     ax.get_yaxis().set_label_coords(-0.1,0.5)
     ax.tick_params(
         axis='x',          # changes apply to the x-axis
@@ -581,7 +591,31 @@ for index, classLoc in enumerate(indices):
     for barIndex, starTime in enumerate(segmentTime):
         ax.axvspan(starTime, starTime + frameLength, facecolor='black', alpha=float(attentionScoresNorm[barIndex]),zorder=99)
 
-    ax.set_ylabel(r'Gyro (rad/s)', size =16)
+    ax.set_ylabel(r'Gyro (rad/s)', size =10)
+    ax.get_yaxis().set_label_coords(-0.1,0.5)
+    ax.tick_params(
+        axis='x',          # changes apply to the x-axis
+        labelbottom=False) 
+
+    plt.margins(x=0)
+    
+    if(tokenBased):
+        attentionScores = np.mean(attentionGravWeights[0],axis = 0)[0,1:]
+    else:
+         attentionScores = np.mean(attentionGravWeights[0],axis = 0)[0,:]
+    attentionScoresNorm = ((attentionScores - min(attentionScores))/(max(attentionScores) - min(attentionScores)) -1) * - 0.5
+    
+    ax = fig.add_subplot(gs[2], sharex=ax)
+    ax.margins(x=0)
+
+    ax.plot( centralTestData[classLoc][:,6], label = "x-axis")
+    ax.plot( centralTestData[classLoc][:,7],label = "y-axis")
+    ax.plot( centralTestData[classLoc][:,8], label = "z-axis")
+    
+    for barIndex, starTime in enumerate(segmentTime):
+        ax.axvspan(starTime, starTime + frameLength, facecolor='black', alpha=float(attentionScoresNorm[barIndex]),zorder=99)
+
+    ax.set_ylabel(r'Grav (rad/s)', size =10)
     ax.get_yaxis().set_label_coords(-0.1,0.5)
     plt.xticks([0,32,64,96,128])
     fig.get_axes()[2].set_xticklabels([0,0.64,1.28,1.9, 2.56])

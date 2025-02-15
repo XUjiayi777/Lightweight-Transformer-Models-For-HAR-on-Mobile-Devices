@@ -9,6 +9,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 import numpy as np
 from keras.activations import swish
+import pdb
 
 randomSeed = 1
 # tf.random.set_seed(randomSeed)
@@ -324,15 +325,15 @@ class threeSensorPatches(layers.Layer):
         self.projection_dim = projection_dim
         self.accProjection = layers.Conv1D(filters = int(projection_dim//3),kernel_size = patchSize,strides = timeStep, data_format = "channels_last")
         self.gyroProjection = layers.Conv1D(filters = int(projection_dim//3),kernel_size = patchSize,strides = timeStep, data_format = "channels_last")
-        self.magProjection = layers.Conv1D(filters = int(projection_dim//3),kernel_size = patchSize,strides = timeStep, data_format = "channels_last")
+        self.gravProjection = layers.Conv1D(filters = int(projection_dim//3),kernel_size = patchSize,strides = timeStep, data_format = "channels_last")
 
     def call(self, inputData):
 
         accProjections = self.accProjection(inputData[:,:,:3])
         gyroProjections = self.gyroProjection(inputData[:,:,3:6])
-        magProjections = self.magProjection(inputData[:,:,6:])
+        gravProjections = self.gravProjection(inputData[:,:,6:])
 
-        Projections = tf.concat((accProjections,gyroProjections,magProjections),axis=2)
+        Projections = tf.concat((accProjections,gyroProjections,gravProjections),axis=2)
         return Projections
     def get_config(self):
         config = super().get_config().copy()
@@ -387,6 +388,10 @@ def HART(input_shape,activityCount, projection_dim = 192,patchSize = 16,timeStep
     if(useTokens):
         patches = ClassToken(projection_dim)(patches)
     patchCount = patches.shape[1] 
+    print("HART")
+    print("patchCount:",patchCount)
+    print("patch_shape",patches.shape)
+    
     encoded_patches = PatchEncoder(patchCount, projection_dim)(patches)
     # Create multiple layers of the Transformer block.
     for layerIndex, kernelLength in enumerate(convKernels):        
@@ -407,6 +412,57 @@ def HART(input_shape,activityCount, projection_dim = 192,patchSize = 16,timeStep
         branch2Gyro = SensorWiseMHA(projectionQuarter,num_heads,projectionQuarter + projectionHalf ,projection_dim,dropPathRate = dropPathRate[layerIndex],dropout_rate = dropout_rate, name = "GyroMHA_"+str(layerIndex))(x1)
         concatAttention = layers.Concatenate(axis=2)((branch2Acc,branch1,branch2Gyro))
 
+        
+        x2 = layers.Add()([concatAttention, encoded_patches])
+        x3 = layers.LayerNormalization(epsilon=1e-6)(x2)
+        x3 = mlp2(x3, hidden_units=transformer_units, dropout_rate=dropout_rate)
+        x3 = DropPath(dropPathRate[layerIndex])(x3)
+        encoded_patches = layers.Add()([x3, x2])
+    representation = layers.LayerNormalization(epsilon=1e-6)(encoded_patches)
+    if(useTokens):
+        representation = layers.Lambda(lambda v: v[:, 0], name="ExtractToken")(representation)
+    else:
+        representation = layers.GlobalAveragePooling1D()(representation)
+    features = mlp(representation, hidden_units=mlp_head_units, dropout_rate=dropout_rate)
+    logits = layers.Dense(activityCount,  activation='softmax')(features)
+    model = tf.keras.Model(inputs=inputs, outputs=logits)
+    return model
+
+def HART_3sensors(input_shape,activityCount, projection_dim = 192,patchSize = 16,timeStep = 16,num_heads = 3,filterAttentionHead = 4, convKernels = [3, 7, 15, 31, 31, 31], mlp_head_units = [1024],dropout_rate = 0.3,useTokens = False):
+    projectionHalf = projection_dim//2
+    projectionSixth = projection_dim//6
+    dropPathRate = np.linspace(0, dropout_rate* 10, len(convKernels)) * 0.1
+    transformer_units = [
+    projection_dim * 2,
+    projection_dim,]  
+    inputs = layers.Input(shape=input_shape)
+    patches = threeSensorPatches(projection_dim,patchSize,timeStep)(inputs)
+    if(useTokens):
+        patches = ClassToken(projection_dim)(patches)
+    patchCount = patches.shape[1] 
+    print("HART_3sensors")
+    print("patchCount:",patchCount)
+    print("patch_shape",patches.shape)
+
+    encoded_patches = PatchEncoder(patchCount, projection_dim)(patches)
+    # Create multiple layers of the Transformer block.
+    for layerIndex, kernelLength in enumerate(convKernels):        
+        x1 = layers.LayerNormalization(epsilon=1e-6 , name = "normalizedInputs_"+str(layerIndex))(encoded_patches)
+        branch1 = liteFormer(
+                          startIndex = projectionSixth,
+                          stopIndex = projectionSixth + projectionHalf,
+                          projectionSize = projectionHalf,
+                          attentionHead =  filterAttentionHead, 
+                          kernelSize = kernelLength,
+                          dropPathRate = dropPathRate[layerIndex],
+                          dropout_rate = dropout_rate,
+                          name = "liteFormer_"+str(layerIndex))(x1)
+
+                          
+        branch2Acc = SensorWiseMHA(projectionSixth,num_heads,0,projectionSixth,dropPathRate = dropPathRate[layerIndex],dropout_rate = dropout_rate,name = "AccMHA_"+str(layerIndex))(x1)
+        branch2Gyro = SensorWiseMHA(projectionSixth,num_heads,projectionSixth + projectionHalf ,projectionSixth*2 + projectionHalf,dropPathRate = dropPathRate[layerIndex],dropout_rate = dropout_rate, name = "GyroMHA_"+str(layerIndex))(x1)
+        branch2Grav = SensorWiseMHA(projectionSixth,num_heads,projectionSixth*2 + projectionHalf ,projection_dim,dropPathRate = dropPathRate[layerIndex],dropout_rate = dropout_rate, name = "GravMHA_"+str(layerIndex))(x1)
+        concatAttention = layers.Concatenate(axis=2)((branch2Acc,branch1,branch2Gyro,branch2Grav))
         
         x2 = layers.Add()([concatAttention, encoded_patches])
         x3 = layers.LayerNormalization(epsilon=1e-6)(x2)

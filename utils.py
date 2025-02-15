@@ -289,9 +289,9 @@ def loadDataset(dataSetName, clientCount, dataConfig, randomSeed, mainDir, Strat
         clientLabel = []
 
         for i in range(0,clientCount):
-            clientData.append(hkl.load(mainDir + 'datasetStandardized/'+dataSetName+'/UserData'+str(i)+'.hkl'))
-            clientLabel.append(hkl.load(mainDir + 'datasetStandardized/'+dataSetName+'/UserLabel'+str(i)+'.hkl'))
-            
+            clientData.append(hkl.load(mainDir + 'datasetStandardized_s3/'+dataSetName+'/UserData'+str(i)+'.hkl'))
+            clientLabel.append(hkl.load(mainDir + 'datasetStandardized_s3/'+dataSetName+'/UserLabel'+str(i)+'.hkl'))
+        
         if(dataSetName == "HHAR"):
             orientations = hkl.load(mainDir + 'datasetStandardized/HHAR/deviceIndex.hkl')
             orientationsNames = ['nexus4', 'lgwatch','s3', 's3mini','gear','samsungold']
