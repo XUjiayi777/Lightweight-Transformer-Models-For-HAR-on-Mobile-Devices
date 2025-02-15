@@ -214,7 +214,7 @@ else:
 
 activityCount = len(ACTIVITY_LABEL)
 
-architectureType = str(architecture)+'_'+str(int(frameLength))+'frameLength_'+str(timeStep)+'TimeStep_'+str(projection_dim)+"ProjectionSize_"+str(learningRate)+'LR'
+architectureType = str(architecture)+'_'+'2sensors_'+str(int(localEpoch))+'localEpoch_'+str(int(frameLength))+'frameLength_'+str(timeStep)+'TimeStep_'+str(projection_dim)+"ProjectionSize_"+str(learningRate)+'LR'
 if(tokenBased):
     architectureType = architectureType + "_tokenBased"
     
