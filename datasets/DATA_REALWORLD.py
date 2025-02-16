@@ -138,7 +138,7 @@ for index,value in enumerate(orientations):
 # download and unzipping dataset
 os.makedirs('dataset',exist_ok=True)
 print("downloading...")            
-data_directory = os.path.abspath("dataset/realworld2016_dataset.zip")
+data_directory = os.path.abspath("dataset/download/realworld2016_dataset.zip")
 if not os.path.exists(data_directory):
     download_url("http://wifo5-14.informatik.uni-mannheim.de/sensor/dataset/realworld2016/realworld2016_dataset.zip",data_directory)
     print("download done")
@@ -162,10 +162,12 @@ else:
 for id in range(1,16):
     id = str(id)
     for activity in activities:
-        for sensor in ["acc","gyr"]:
+        for sensor in ["acc","gyr","mag"]:
             dirName = sensor
             if(sensor == "gyr"):
                 dirName = "Gyroscope"
+            elif (sensor=="mag"):
+                dirName = "MagneticField"
             with zipfile.ZipFile('dataset/realworld2016_dataset/proband'+id+'/data/'+sensor+'_'+str(activity)+'_csv.zip', 'r') as zip_ref:
                 os.makedirs('dataset/REALWORLD/'+dirName+'/'+id, exist_ok=True)
                 zip_ref.extractall('dataset/REALWORLD/'+dirName+'/'+id)
@@ -195,97 +197,141 @@ def downSampleLowPass(toDownSampleData,factor):
 
 
 # Reading and processing all data
-
 clientsOrientation = []
 
 nbAnomalies = 0 
 clientsAccDataByOrientation = []
 clientsGyroDataByOrientation = []
+clientMagDataByOrientation = []
 clientsLabelByOrientation = []
+
 for orientation in orientations:
     
     xAccListClient = list()
     xGyrListClient = list()
+    xMagListClient = list()  
     yListClient = list()
     
-    for k in range(1,16):
+    for k in range(1, 16):
         xAccList = list()
         xGyrList = list()
+        xMagList = list() 
         yList = list()
         startingIndex = 0
         
         clientOrientation = []
         
         for activity in activities:
-            tempAcc = load_dataset('acc','REALWORLD',activity,orientation,0,k)
-            tempGyro = load_dataset('Gyroscope','REALWORLD',activity,orientation,0,k)
+            tempAcc = load_dataset('acc', 'REALWORLD', activity, orientation, 0, k)
+            tempGyro = load_dataset('Gyroscope', 'REALWORLD', activity, orientation, 0, k)
+            tempMag = load_dataset('MagneticField', 'REALWORLD', activity, orientation, 0, k)  # Load magnetometer data
             orientationLength = 0 
             for i in range(0, len(tempAcc)):  
                 accDataLength = len(tempAcc[i])
                 gyroDataLength = len(tempGyro[i])
-                difference = accDataLength - gyroDataLength
-                differenceAbs = abs(difference)
-                differenceGyro = gyroDataLength - accDataLength
-                if(differenceGyro > 1000):
+                magDataLength = len(tempMag[i])
+                
+                # Compare the lengths of accelerometer, gyroscope, and magnetometer data
+                differenceAccGyro = accDataLength - gyroDataLength
+                differenceAccMag = accDataLength - magDataLength
+                differenceGyroAcc = gyroDataLength - accDataLength
+                differenceGyroMag = gyroDataLength - magDataLength
+                
+                differenceAbsAccGyro = abs(differenceAccGyro)
+                differenceAbsAccMag = abs(differenceAccMag)
+                differenceAbsGyroMag = abs(differenceGyroMag)
+                
+                # Handle misalignment between accelerometer and gyroscope data
+                if differenceGyroAcc > 1000:
                     print("Client Number "+str(k) +" Activity : "+str(activity) + " Orientation :"+str(orientation))
-                    print("Disalignment of:" +str(differenceAbs) + " found")
+                    print("Disalignment of Acc and Gyro data: " + str(differenceAbsAccGyro) + " found")
                     print("Acc data: "+str(accDataLength))
                     print("Gyro data: "+str(gyroDataLength))
-                    tempGyro[i] = resampy.resample(tempGyro[i], gyroDataLength, accDataLength,axis = 0)
+                    tempGyro[i] = resampy.resample(tempGyro[i], gyroDataLength, accDataLength, axis=0)
 
-                tempAcc[i] = segmentData(tempAcc[i],128,64)
-                tempGyro[i] = segmentData(tempGyro[i],128,64)
+                # Handle misalignment between accelerometer and magnetometer data
+                if differenceAbsAccMag > 1000:
+                    print("Client Number "+str(k) +" Activity : "+str(activity) + " Orientation :"+str(orientation))
+                    print("Disalignment of Acc and Mag data: " + str(differenceAbsAccMag) + " found")
+                    print("Acc data: "+str(accDataLength))
+                    print("Mag data: "+str(magDataLength))
+                    tempMag[i] = resampy.resample(tempMag[i], magDataLength, accDataLength, axis=0)
+
+                # Handle misalignment between gyroscope and magnetometer data
+                if differenceAbsGyroMag > 1000:
+                    print("Client Number "+str(k) +" Activity : "+str(activity) + " Orientation :"+str(orientation))
+                    print("Disalignment of Gyro and Mag data: " + str(differenceAbsGyroMag) + " found")
+                    print("Gyro data: "+str(gyroDataLength))
+                    print("Mag data: "+str(magDataLength))
+                    tempMag[i] = resampy.resample(tempMag[i], magDataLength, gyroDataLength, axis=0)
+
+                # Segment the data (acc, gyro, mag)
+                tempAcc[i] = segmentData(tempAcc[i], 128, 64)
+                tempGyro[i] = segmentData(tempGyro[i], 128, 64)
+                tempMag[i] = segmentData(tempMag[i], 128, 64)
 
                 accDataLength = len(tempAcc[i])
                 gyroDataLength = len(tempGyro[i])
+                magDataLength = len(tempMag[i])
 
                 difference = accDataLength - gyroDataLength
                 differenceAbs = abs(difference)
-                if(differenceAbs < 21):
+                
+                # If accelerometer, gyroscope, and magnetometer data lengths are compatible, proceed
+                if abs(accDataLength - gyroDataLength) < 21 and abs(accDataLength - magDataLength) < 21 and abs(gyroDataLength - magDataLength) < 21:
                     toAddShape = 0
-                    if(difference > 0):
-                        maxIndex = accDataLength-differenceAbs
-                        xAccList.append(tempAcc[i][:maxIndex,:])
-                        xGyrList.append(tempGyro[i])
-                        toAddShape = tempGyro[i].shape[0]
-                        yList.append(np.full((toAddShape), activities.index(activity)))   
+                    if accDataLength >= gyroDataLength and accDataLength >= magDataLength:
+                        # If accelerometer is the longest, trim gyroscope and magnetometer data to match its length
+                        maxIndex = accDataLength - max(abs(accDataLength - gyroDataLength), abs(accDataLength - magDataLength))
+                        xAccList.append(tempAcc[i][:maxIndex, :])
+                        xGyrList.append(tempGyro[i][:maxIndex, :])
+                        xMagList.append(tempMag[i][:maxIndex, :])  # Add magnetometer data
+                        toAddShape = tempAcc[i][:maxIndex, :].shape[0]
+                    elif gyroDataLength >= accDataLength and gyroDataLength >= magDataLength:
+                        # If gyroscope is the longest, trim accelerometer and magnetometer data to match its length
+                        maxIndex = gyroDataLength - max(abs(gyroDataLength - accDataLength), abs(gyroDataLength - magDataLength))
+                        xAccList.append(tempAcc[i][:maxIndex, :])
+                        xGyrList.append(tempGyro[i][:maxIndex, :])
+                        xMagList.append(tempMag[i][:maxIndex, :])  # Add magnetometer data
+                        toAddShape = tempGyro[i][:maxIndex, :].shape[0]
                     else:
-                        maxIndex = gyroDataLength-differenceAbs
-                        xAccList.append(tempAcc[i])
-                        xGyrList.append(tempGyro[i][:maxIndex,:])
-                        toAddShape = tempAcc[i].shape[0]
-                        yList.append(np.full((toAddShape), activities.index(activity)))
-#                     clientOrientation.append(np.full(toAddShape,orientationKeyMap[orientation]))
-#         clientsOrientation.append(np.hstack((clientOrientation)))
+                        # If magnetometer is the longest, trim accelerometer and gyroscope data to match its length
+                        maxIndex = magDataLength - max(abs(magDataLength - accDataLength), abs(magDataLength - gyroDataLength))
+                        xAccList.append(tempAcc[i][:maxIndex, :])
+                        xGyrList.append(tempGyro[i][:maxIndex, :])
+                        xMagList.append(tempMag[i][:maxIndex, :])  # Add magnetometer data
+                        toAddShape = tempMag[i][:maxIndex, :].shape[0]
+
+                    # Add activity labels for each sensor reading
+                    yList.append(np.full((toAddShape), activities.index(activity)))
+
+
         xAccListClient.append(np.vstack((xAccList)))
         xGyrListClient.append(np.vstack((xGyrList)))
+        xMagListClient.append(np.vstack((xMagList)))  # Append magnetometer data
         yListClient.append(np.hstack((yList)))
     clientsAccDataByOrientation.append(np.asarray(xAccListClient, dtype=object))
     clientsGyroDataByOrientation.append(np.asarray(xGyrListClient, dtype=object))
+    clientMagDataByOrientation.append(np.asarray(xMagListClient, dtype=object))
     clientsLabelByOrientation.append(np.asarray(yListClient, dtype=object))
 
 
-# In[ ]:
-
-
-
-
 
 # In[ ]:
-
-
 # conversion to numpy array
 clientsAccDataByOrientation = np.asarray(clientsAccDataByOrientation, dtype=object)
 clientsGyroDataByOrientation = np.asarray(clientsGyroDataByOrientation, dtype=object)
+clientMagDataByOrientation = np.asarray(clientMagDataByOrientation, dtype=object)
 clientsLabelByOrientation = np.asarray(clientsLabelByOrientation, dtype=object)
-
 
 # In[ ]:
 
+# In[ ]:
 
 # stacking all partcipants client
 allAcc = np.vstack((np.ravel(clientsAccDataByOrientation)))
 allGyro = np.vstack((np.ravel(clientsGyroDataByOrientation)))
+allMag = np.vstack((np.ravel(clientMagDataByOrientation)))
 
 
 # In[ ]:
@@ -298,6 +344,9 @@ stdAcc = np.std(allAcc)
 meanGyro = np.mean(allGyro)
 stdGyro = np.std(allGyro)
 
+meanMag = np.mean(allMag)
+stdMag = np.std(allMag)
+
 
 # In[ ]:
 
@@ -305,14 +354,13 @@ stdGyro = np.std(allGyro)
 # channel-wise z-normalization
 normalizedAcc = (clientsAccDataByOrientation - meanAcc)/stdAcc
 normalizedGyro = (clientsGyroDataByOrientation - meanGyro)/stdGyro
+normalizedMag = (clientMagDataByOrientation-meanMag)/stdMag
 
 
 # In[ ]:
-
-
 stackedOrientationData = []
-for normAcc,normGyro in zip(normalizedAcc,normalizedGyro):
-    stackedOrientationData.append(np.asarray([np.dstack((normAcc,normGyro)) for normAcc,normGyro in zip(normAcc,normGyro)],dtype=object))
+for normAcc,normGyro,normMag in zip(normalizedAcc,normalizedGyro,normalizedMag):
+    stackedOrientationData.append(np.asarray([np.dstack((normAcc,normGyro,normMag)) for normAcc,normGyro,normMag in zip(normAcc,normGyro,normMag)],dtype=object))
 stackedOrientationData = np.asarray(stackedOrientationData, dtype=object)
 
 
@@ -320,9 +368,9 @@ stackedOrientationData = np.asarray(stackedOrientationData, dtype=object)
 
 
 dataName = 'RealWorld'
-os.makedirs('datasetStandardized/'+dataName, exist_ok=True)
-hkl.dump(stackedOrientationData,'datasetStandardized/'+dataName+ '/clientsData.hkl' )
-hkl.dump(clientsLabelByOrientation,'datasetStandardized/'+dataName+ '/clientsLabel.hkl' )
+os.makedirs('datasetStandardized_s3/'+dataName, exist_ok=True)
+hkl.dump(stackedOrientationData,'datasetStandardized_s3/'+dataName+ '/clientsData.hkl' )
+hkl.dump(clientsLabelByOrientation,'datasetStandardized_s3/'+dataName+ '/clientsLabel.hkl' )
 
 
 # In[ ]:

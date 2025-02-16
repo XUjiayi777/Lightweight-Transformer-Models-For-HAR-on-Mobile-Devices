@@ -228,8 +228,8 @@ def loadDataset(dataSetName, clientCount, dataConfig, randomSeed, mainDir, Strat
         clientDataTest = {new_list: [] for new_list in range(clientCount)}
         clientLabelTest = {new_list: [] for new_list in range(clientCount)}
         
-        clientOrientationData = hkl.load(mainDir + 'datasetStandardized/'+str(dataSetName)+'/clientsData.hkl')
-        clientOrientationLabel = hkl.load(mainDir + 'datasetStandardized/'+str(dataSetName)+'/clientsLabel.hkl')
+        clientOrientationData = hkl.load(mainDir + 'datasetStandardized_s3/'+str(dataSetName)+'/clientsData.hkl')
+        clientOrientationLabel = hkl.load(mainDir + 'datasetStandardized_s3/'+str(dataSetName)+'/clientsLabel.hkl')
         
 
         clientOrientationTest = {new_list: [] for new_list in range(clientCount)}
