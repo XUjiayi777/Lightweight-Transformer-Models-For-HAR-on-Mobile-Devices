@@ -203,7 +203,6 @@ if(positionDevice != ''):
 
 # In[ ]:
 
-
 # specifying activities and where the results will be stored 
 if(dataSetName == 'UCI'):
     ACTIVITY_LABEL = ['Walking', 'Upstair','Downstair', 'Sitting', 'Standing', 'Lying']
@@ -213,6 +212,8 @@ elif(dataSetName == "MotionSense"):
     ACTIVITY_LABEL = ['Downstairs', 'Upstairs', 'Sitting', 'Standing', 'Walking', 'Jogging']
 elif(dataSetName == "HHAR"):
     ACTIVITY_LABEL = ['Sitting', 'Standing', 'Walking', 'Upstair', 'Downstairs', 'Biking']
+elif(dataSetName == 'Ours'):
+    ACTIVITY_LABEL=['Not used','Using']
 else:
 #     SHL
     ACTIVITY_LABEL = ['Standing','Walking','Runing','Biking','Car','Bus','Train','Subway']
@@ -306,6 +307,7 @@ if(dataSetName == "COMBINED"):
     print("centralTrainData shape2: ", centralTrainData.shape)
 else:
     clientCount = utils.returnClientByDataset(dataSetName)
+    print("clientCount:", clientCount)
     datasetLoader = utils.loadDataset(dataSetName,clientCount,dataConfig,randomSeed,mainDir+'datasets/')
     centralTrainData = datasetLoader.centralTrainData 
     centralTrainLabel = datasetLoader.centralTrainLabel 

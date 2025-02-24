@@ -94,7 +94,6 @@ def matchLabel(activityFileName):
 
 
 def segmentData(accData,time_step,step):
-#     print(accData.shape)
     step = int(step)
     segmentAccData = []
     for i in range(0, accData.shape[0] - time_step,step):
@@ -158,8 +157,6 @@ for activityIndex, activityFileName in enumerate(dirs):
 
 
 # In[ ]:
-
-
 processedData = []
 processedLabel = []
 clientSize = []
@@ -170,7 +167,10 @@ for clientIndex in range(24):
 
 # In[ ]:
 
-
+print(processedData[0].shape)
+print(processedLabel[0].shape)
+print(processedData[0])
+print(processedLabel[0])
 combinedUserData = np.vstack((processedData))
 
 
@@ -208,9 +208,7 @@ combinedGraData = (combinedGraData - GraMean)/Grastd
 
 combinedUserData = np.dstack((combinedAccData,combinedGyroData,combinedGraData))
 
-
 # In[ ]:
-
 
 startIndex = 0
 endIndex = 0 

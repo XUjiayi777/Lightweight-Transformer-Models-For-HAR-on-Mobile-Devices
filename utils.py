@@ -50,6 +50,8 @@ def returnClientByDataset(dataSetName):
         return 9
     elif(dataSetName == "HHAR"):
         return 51
+    elif (dataSetName == "Ours"):
+        return 9
     else:
         raise ValueError('Unknown dataset')
     
