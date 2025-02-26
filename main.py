@@ -567,8 +567,10 @@ for index, classLoc in enumerate(indices):
     ax.plot( centralTestData[classLoc][:,0], label = "x-axis")
     ax.plot( centralTestData[classLoc][:,1], label = "y-axis")
     ax.plot( centralTestData[classLoc][:,2], label = "z-axis")
+ 
     for barIndex, starTime in enumerate(segmentTime):
-        ax.axvspan(starTime, starTime + frameLength, facecolor='black', alpha=float(attentionScoresNorm[barIndex]),zorder=4)
+        if not (tokenBased and barIndex >= len(attentionScoresNorm)):
+            ax.axvspan(starTime, starTime + frameLength, facecolor='black', alpha=float(attentionScoresNorm[barIndex]),zorder=4)
         
     ax.set_ylabel(r'Acc ($m/s^2$)', size =10)
     ax.get_yaxis().set_label_coords(-0.1,0.5)
@@ -617,7 +619,7 @@ for index, classLoc in enumerate(indices):
     for barIndex, starTime in enumerate(segmentTime):
         ax.axvspan(starTime, starTime + frameLength, facecolor='black', alpha=float(attentionScoresNorm[barIndex]),zorder=99)
 
-    ax.set_ylabel(r'Grav (rad/s)', size =10)
+    ax.set_ylabel(r'Mag (rad/s)', size =10)
     ax.get_yaxis().set_label_coords(-0.1,0.5)
     plt.xticks([0,32,64,96,128])
     fig.get_axes()[2].set_xticklabels([0,0.64,1.28,1.9, 2.56])
